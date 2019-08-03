@@ -116,10 +116,10 @@ for step_num in range(1):#6):
 
     ##Add Noise (Gaussian)
     noise_factor = 0.5
-    x1train_noisy = x1train + noise_factor
-        * np.random.normal(loc=0.0, scale=1.0, size=x1train.shape) 
-    x1val_noisy = x1val + noise_factor
-        * np.random.normal(loc=0.0, scale=1.0, size=x1val.shape) 
+    x1train_noisy = x1train + noise_factor * np.random.normal(
+        loc=0.0, scale=1.0, size=x1train.shape) 
+    x1val_noisy = x1val + noise_factor * np.random.normal(
+        loc=0.0, scale=1.0, size=x1val.shape) 
 
     x1train_noisy = np.clip(x1train_noisy, 0., 1.)
     x1val_noisy = np.clip(x1val_noisy, 0., 1.)
