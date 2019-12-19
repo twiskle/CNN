@@ -6,7 +6,11 @@ Cnn_main
 
 this script creates the Cnn model based on the steps as specified in the class CnnSteps
 
-using Python 3.5.2
+Python 3.7.5
+TensorFlow 2.0.0
+Keras 2.2.4
+
+12/16/19: updated changes for 2-input model (T1 and MM)
 
 '''
 
@@ -32,7 +36,7 @@ z_Lsize = 193
 
 
 save_path="/home/pchu/DATA/deep_learning/DTI_CTN_MSTN/Results"
-file_suffix = "_DTI_1-param_epoch50_6fold_step"
+file_suffix = "_DTI_2-param_epoch30_6fold_step"
 
 ##Dataset
 '''
@@ -49,7 +53,11 @@ foldersPath1= ["/home/pchu/DATA/deep_learning/MM_CTN_MSTN_5d/MSTN/betted_trunc",
 foldersPath1= ["/home/pchu/DATA/deep_learning/T1_CTN_MSTN/MSTN/brainstem_masked_trunc", 
     "/home/pchu/DATA/deep_learning/T1_CTN_MSTN/CTN/brainstem_masked_trunc"]
 
+foldersPath2= ["/home/pchu/DATA/deep_learning/MM_CTN_MSTN_5d/MSTN/pons_masked_trunc", 
+    "/home/pchu/DATA/deep_learning/MM_CTN_MSTN_5d/CTN/pons_masked_trunc"]
+
 ##subject_space
+'''
 foldersPath2= ["/home/pchu/DATA/deep_learning/DTI_CTN_MSTN/MSTN/FA/betted", 
     "/home/pchu/DATA/deep_learning/DTI_CTN_MSTN/CTN/FA/betted"]
 
@@ -58,9 +66,22 @@ foldersPath3= ["/home/pchu/DATA/deep_learning/DTI_CTN_MSTN/MSTN/MD/betted",
 
 foldersPath4= ["/home/pchu/DATA/deep_learning/DTI_CTN_MSTN/MSTN/AD/betted", 
     "/home/pchu/DATA/deep_learning/DTI_CTN_MSTN/CTN/AD/betted"]
+'''
+
+#Model Parameters
+batch_size = 8
+epochs = 20
+num_classes = 2
+n_splits = 6
 
 
-for step_num in range(1):#6):
+def execute(cmd,dryrun=False):
+    print("->"+cmd+"\n")
+    if not dryrun:
+        os.system(cmd)
+
+
+for step_num in range(n_splits):
 
     print("current step is: {}".format(step_num))
 
@@ -70,36 +91,34 @@ for step_num in range(1):#6):
     t0 = time.time()
 
     #random_state, directories, x_Lsize, y_Lsize, z_Lsize
-    Cnn = CnnSteps.CnnSteps(random_state,foldersPath1,x_Lsize,y_Lsize,z_Lsize)
+    Cnn1 = CnnSteps.CnnSteps(random_state,foldersPath1,x_Lsize,y_Lsize,z_Lsize)
+    Cnn2 = CnnSteps.CnnSteps(random_state,foldersPath2,x_Lsize,y_Lsize,z_Lsize)
 
-
-    [X1,encoded_Y1] = Cnn.Pre_Model_Steps()
+    [X1,encoded_Y1] = Cnn1.Pre_Model_Steps()
+    [X2,encoded_Y2] = Cnn2.Pre_Model_Steps()
     
     ##4. create model
-    batch_size = 4  ## or 128 / 256 depending on memory size
-    epochs = 30
-    num_classes = 2
-    n_splits = 6
-
-
     kfold = StratifiedKFold(n_splits=n_splits, shuffle=True,
         random_state=random_state)
 
 
     # Loop through the indices the split() method returns
-    (index, (train_indices,val_indices)) = list(enumerate(
+    (index, (train_indices,test_indices)) = list(enumerate(
         kfold.split(X1, encoded_Y1)))[step_num]
     print("Training on fold {} / {} ...".format(step_num+1,kfold.n_splits))
     # Generate batches from indices
-    x1train, x1val = X1[train_indices], X1[val_indices]
+    x1train, x1test = X1[train_indices], X1[test_indices]
+    x2train, x2test = X2[train_indices], X2[test_indices]
 
-
+    '''
     x1train = x1train.astype('float32') / np.max(x1train)
-    x1val = x1val.astype('float32') / np.max(x1val)
+    x1test = x1test.astype('float32') / np.max(x1test)
+    x2train = x2train.astype('float32') / np.max(x2train)
+    x2test = x2test.astype('float32') / np.max(x2test)
+    '''
 
-
-    y1train, y1val = encoded_Y1[train_indices], encoded_Y1[val_indices]
-
+    y1train, y1test = encoded_Y1[train_indices], encoded_Y1[test_indices]
+    y2train, y2test = encoded_Y2[train_indices], encoded_Y2[test_indices]
 
     # Clear model, and create it
     model = None
@@ -107,38 +126,33 @@ for step_num in range(1):#6):
     #    from keras import backend as K
     #    tf_session = K.get_session()
 
-    model = Cnn.FinalModel(num_classes,X1)#,X2,X3,X4)
-
-    X2 = None       ## trying out 1 parameter first 
-    X3 = None
-    X4 = None
-
+    model = Cnn1.FinalModel(num_classes,X1,X2)
 
     ##Add Noise (Gaussian)
+    '''
     noise_factor = 0.5
     x1train_noisy = x1train + noise_factor * np.random.normal(
         loc=0.0, scale=1.0, size=x1train.shape) 
-    x1val_noisy = x1val + noise_factor * np.random.normal(
-        loc=0.0, scale=1.0, size=x1val.shape) 
+    x1test_noisy = x1test + noise_factor * np.random.normal(
+        loc=0.0, scale=1.0, size=x1test.shape) 
 
     x1train_noisy = np.clip(x1train_noisy, 0., 1.)
-    x1val_noisy = np.clip(x1val_noisy, 0., 1.)
+    x1test_noisy = np.clip(x1test_noisy, 0., 1.)
+    '''
 
-    # Debug message I guess
+    # Model Parameters Output Message
     print("Training new iteration on {} training samples, "
         "{} validation samples, this may be a while...".format(
-        x1train.shape[0],x1val.shape[0]))
+        x1train.shape[0],x1test.shape[0]))
     print("Training indices: {}".format(train_indices))
-    print("Validation indices: {}".format(val_indices))
+    print("Validation indices: {}".format(test_indices))
     print("batch size: {}, epochs = {}".format(batch_size, epochs))
+    model.summary()
 
+#    input()
 
-    '''
-    train = model.fit(x1train, x1train, batch_size=batch_size,
-        epochs=epochs,verbose=1, validation_data=(x1val, x1val))
-    '''
-    train = model.fit(x1train_noisy, x1train, batch_size=batch_size,
-        epochs=epochs,verbose=1, validation_data=(x1val_noisy, x1val))
+    train = model.fit(x=[x1train, x2train],y=y1train, batch_size=batch_size,
+        epochs=epochs,verbose=1, validation_data=([x1test, x2test],y1test))
 
 
 
@@ -160,13 +174,13 @@ for step_num in range(1):#6):
     results_txt.write("Training indices: \n")
     results_txt.writelines(str(train_indices)+"\n")
     results_txt.write("Validation indices: \n")
-    results_txt.writelines(str(val_indices)+"\n")
+    results_txt.writelines(str(test_indices)+"\n")
     results_txt.write(re.sub("[|]|'|,","",str(train.history.keys()))+"\n")
     results_txt.write(re.sub("[|]|'|,","",str(train.history.values()))+"\n")
 
 
     saveImageName="figure"+model_suffix+".png"
-    Cnn.Result_Figure(train,save_path,saveImageName)
+    Cnn1.Result_Figure(train,save_path,saveImageName)
 
 
     ##8. Saving model
